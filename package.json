@@ -1,0 +1,30 @@
+{
+  "name": "gerritbot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "lib/index.js",
+  "scripts": {
+    "test": "tape test/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joyent/node-gerritbot.git"
+  },
+  "author": "",
+  "license": "MPL-2.0",
+  "bugs": {
+    "url": "https://github.com/joyent/node-gerritbot/issues"
+  },
+  "homepage": "https://github.com/joyent/node-gerritbot#readme",
+  "dependencies": {
+    "assert-plus": "^1.0.0",
+    "bunyan": "^1.8.1",
+    "lstream": "0.0.4",
+    "mooremachine": "^2.0.0",
+    "sshpk": "^1.9.0",
+    "sshpk-agent": "^1.3.0",
+    "vasync": "^1.6.4",
+    "verror": "^1.8.1",
+    "vstream-json-parser": "^1.0.0"
+  }
+}
