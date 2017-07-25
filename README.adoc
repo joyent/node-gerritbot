@@ -1,0 +1,174 @@
+:toc: left
+:source-highlighter: pygments
+:doctype: book
+:idprefix:
+:docinfo:
+
+:uri-json: https://gerrit-review.googlesource.com/Documentation/json.html
+:uri-review-inp: https://git.eclipse.org/r/Documentation/rest-api-changes.html#review-input
+:uri-events: https://gerrit-review.googlesource.com/Documentation/cmd-stream-events.html
+
+# gerritbot
+
+## About
+
+`gerritbot` is a basic framework for building a Gerrit bot in node.js, using
+the SSH interface.
+
+## Installation
+
+```
+npm install gerritbot
+```
+
+## License
+
+MPL-v2
+
+## Contributing
+
+Contributions should be made via the https://cr.joyent.us[Joyent Gerrit].
+
+## Examples
+
+### Configuring the client
+
+To use the Gerrit SSH interface, we need a user on the Gerrit instance with an
+SSH private key configured. This key should be stored in a file on disk on the
+bot server.
+
+In this case, the bot's username is `joyent-automation` and we've put its SSH
+private key in `bot.id_rsa`:
+
+[source,js]
+--------------------------------------------------------------------------------
+var mod_gbot = require('./');
+
+var gerrit = new mod_gbot.Client({
+	user: 'joyent-automation',
+	host: 'cr.joyent.us',
+	keyFile: 'bot.id_rsa',
+	recovery: {
+		default: {
+			timeout: 10000,
+			maxTimeout: 30000,
+			delay: 2000,
+			maxDelay: 10000,
+			retries: Infinity
+		}
+	}
+});
+--------------------------------------------------------------------------------
+
+This sets up a new Gerrit client ready to use.
+
+### Querying
+
+Now that we have a client, we can run a query to find some Code Reviews:
+
+[source,js]
+--------------------------------------------------------------------------------
+var qs = gerrit.queryStream('status:open AND NOT label:CI-Testing>=-1', []);
+qs.on('readable', function () {
+	var obj;
+	while ((obj = qs.read()) !== null) {
+		/* do something with each code-review object */
+	}
+});
+--------------------------------------------------------------------------------
+
+The format of the code-review objects returned is specified in the
+{uri-json}[Gerrit JSON format spec], and for a code-review looks something like
+this:
+
+[source,json]
+--------------------------------------------------------------------------------
+{
+  "project": "joyent/smartos-live",
+  "branch": "master",
+  "id": "I28b01be5e36773fa0c0518a8f390f5cf85583956",
+  "number": "55",
+  "subject": "OS-5508 rsyslog should not send kernel NOTICE to the console",
+  "owner": {
+    "name": "Alex Wilson",
+    "email": "alex.wilson@joyent.com",
+    "username": "arekinath"
+  },
+  "url": "https://cr.joyent.us/55",
+  "commitMessage": "OS-5508 rsyslog should not send kernel NOTICE to the console\n",
+  "createdOn": 1468273549,
+  "lastUpdated": 1470436377,
+  "open": true,
+  "status": "NEW"
+}
+--------------------------------------------------------------------------------
+
+You can use the second argument to `queryStream()` to include additional objects
+with the result, including data about the individual patch-sets in the change.
+
+### Event stream
+
+The biggest draw-card feature of the Gerrit SSH interface is the ability to
+listen on the JSON change stream, which outputs events every time something in
+Gerrit changes.
+
+This is very useful for bots so that they do not have to be constantly running
+queries against Gerrit to find the latest changes being uploaded.
+
+The event stream lets you both read out individual events, and also notifies
+you when any kind of discontinuity occurs (e.g. we got disconnected from Gerrit)
+so that you can run a fallback query to catch up.
+
+[source,js]
+--------------------------------------------------------------------------------
+var evs = gerrit.eventStream();
+
+evs.stream.on('readable', function () {
+	var event;
+	while ((event = evs.stream.read()) !== null) {
+		/* Handle the change event! */
+	}
+});
+
+/*
+ * This is emitted whenever there's a discontinuity in the stream and we
+ * have to catch up.
+ */
+evs.on('bootstrap', function () {
+	/* Go do a query to find anything we missed while disconnected. */
+	var q = 'status:open AND NOT label:CI-Testing>=-1';
+	var incl = ['patch-sets'];
+	var qstream = gerrit.queryStream(q, incl);
+	qstream.on('readable', function () {
+		var change;
+		while ((change = qstream.read()) !== null) {
+			/* ... */
+		}
+	});
+});
+--------------------------------------------------------------------------------
+
+The format of the individual events is specified in the Gerrit documentation
+page for {uri-events}[gerrit stream-events].
+
+### Submitting reviews
+
+Of course, we also feature the ability to submit a new review of a patch-set:
+
+[source,js]
+--------------------------------------------------------------------------------
+var target = '696,1';
+var review = {
+	message: 'hi what up',
+	labels: {'Code-Review': '-1'}
+};
+gerrit.review(target, review, function (err) {
+	if (err) {
+		/* ... */
+		return;
+	}
+});
+--------------------------------------------------------------------------------
+
+The JSON format of the review object is specified in the
+{uri-review-inp}[Gerrit REST API documentation].
