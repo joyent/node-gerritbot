@@ -25,10 +25,6 @@ npm install gerritbot
 
 MPL-v2
 
-## Contributing
-
-Contributions should be made via the https://cr.joyent.us[Joyent Gerrit].
-
 ## Examples
 
 ### Configuring the client
